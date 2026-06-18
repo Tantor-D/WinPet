@@ -26,6 +26,9 @@ public sealed class ActivityTrackingService : IAsyncDisposable
 
     public event EventHandler<DailyActivitySummary>? TodaySummaryUpdated;
 
+    public event EventHandler<IReadOnlyList<HourlyActivitySummary>>?
+        TodayTimelineUpdated;
+
     public void Start()
     {
         _monitoringTask ??= MonitorAsync(_stopping.Token);
@@ -91,6 +94,10 @@ public sealed class ActivityTrackingService : IAsyncDisposable
                         snapshot.Timestamp.ToLocalTime().DateTime),
                     cancellationToken).ConfigureAwait(false);
                 TodaySummaryUpdated?.Invoke(this, today);
+                var timeline = await _historyStore.GetHourlyActivityAsync(
+                    today.LocalDate,
+                    cancellationToken).ConfigureAwait(false);
+                TodayTimelineUpdated?.Invoke(this, timeline);
             }
 
             Updated?.Invoke(this, update);

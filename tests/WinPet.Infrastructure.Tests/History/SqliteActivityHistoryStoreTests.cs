@@ -46,6 +46,19 @@ public sealed class SqliteActivityHistoryStoreTests
             Assert.Equal(TimeSpan.FromSeconds(30), summary.ActiveDuration);
             Assert.Equal(TimeSpan.FromSeconds(30), summary.IdleDuration);
             Assert.Equal(TimeSpan.FromMinutes(1), summary.ComputerDuration);
+
+            var timeline = await store.GetHourlyActivityAsync(localDate);
+            Assert.Equal(24, timeline.Count);
+            Assert.Equal(
+                TimeSpan.FromSeconds(30),
+                timeline.Aggregate(
+                    TimeSpan.Zero,
+                    (total, point) => total + point.ActiveDuration));
+            Assert.Equal(
+                TimeSpan.FromSeconds(30),
+                timeline.Aggregate(
+                    TimeSpan.Zero,
+                    (total, point) => total + point.IdleDuration));
         }
         finally
         {

@@ -152,6 +152,54 @@
                 </Grid>
             </StackPanel>
 
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock FontSize="22"
+                               FontWeight="SemiBold"
+                               Text="今日活跃分布"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                        <TextBlock Foreground="#697386"
+                                   Text="高峰"/>
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="{Binding PeakActivityText}"/>
+                    </StackPanel>
+                </Grid>
+                <Border Padding="18"
+                        CornerRadius="14"
+                        Background="#F7F8FA">
+                    <ItemsControl ItemsSource="{Binding HourlyActivityBars}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" Columns="24"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HourlyActivityBarViewModel">
+                                <Grid Height="125"
+                                      RowDefinitions="100,25"
+                                      ToolTip.Tip="{Binding Tooltip}">
+                                    <Border Width="12"
+                                            Height="{Binding BarHeight}"
+                                            MaxHeight="100"
+                                            VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Center"
+                                            CornerRadius="4,4,1,1"
+                                            Background="#6587E8"/>
+                                    <TextBlock Grid.Row="1"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Bottom"
+                                               FontSize="10"
+                                               Foreground="#697386"
+                                               Text="{Binding Label}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
             <Button HorizontalAlignment="Stretch"
                     Padding="16,12"
                     Command="{Binding ResetSessionCommand}"

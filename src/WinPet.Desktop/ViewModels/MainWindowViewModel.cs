@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WinPet.Core.History;
@@ -50,6 +51,14 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _todayRemindersText = "0";
 
+    [ObservableProperty]
+    private string _peakActivityText = "暂无数据";
+
+    public ObservableCollection<HourlyActivityBarViewModel> HourlyActivityBars
+    {
+        get;
+    } = [];
+
     public MainWindowViewModel()
     {
     }
@@ -59,6 +68,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _trackingService = trackingService;
         _trackingService.Updated += OnTrackingUpdated;
         _trackingService.TodaySummaryUpdated += OnTodaySummaryUpdated;
+        _trackingService.TodayTimelineUpdated += OnTodayTimelineUpdated;
         _trackingService.Start();
     }
 
@@ -80,6 +90,11 @@ public partial class MainWindowViewModel : ViewModelBase
         object? sender,
         DailyActivitySummary summary) =>
         Dispatcher.UIThread.Post(() => ApplyTodaySummary(summary));
+
+    private void OnTodayTimelineUpdated(
+        object? sender,
+        IReadOnlyList<HourlyActivitySummary> timeline) =>
+        Dispatcher.UIThread.Post(() => ApplyTodayTimeline(timeline));
 
     private void ApplyUpdate(WorkSessionUpdate update)
     {
@@ -110,6 +125,38 @@ public partial class MainWindowViewModel : ViewModelBase
         TodayBreaksText = summary.QualifiedBreaks.ToString();
         TodayOvertimeText = FormatDuration(summary.OvertimeDuration);
         TodayRemindersText = summary.ReminderCount.ToString();
+    }
+
+    private void ApplyTodayTimeline(
+        IReadOnlyList<HourlyActivitySummary> timeline)
+    {
+        var maximum = timeline.Max(
+            point => point.ActiveDuration.TotalSeconds);
+        HourlyActivityBars.Clear();
+
+        foreach (var point in timeline)
+        {
+            var height = maximum <= 0
+                ? 3
+                : 3 + (97 * point.ActiveDuration.TotalSeconds / maximum);
+            var label = point.Hour % 3 == 0
+                ? point.Hour.ToString("00")
+                : string.Empty;
+            HourlyActivityBars.Add(
+                new HourlyActivityBarViewModel(
+                    label,
+                    height,
+                    $"{point.Hour:00}:00–{point.Hour + 1:00}:00 · " +
+                    $"活跃 {FormatDuration(point.ActiveDuration)}"));
+        }
+
+        var peak = timeline
+            .Where(point => point.ActiveDuration > TimeSpan.Zero)
+            .OrderByDescending(point => point.ActiveDuration)
+            .FirstOrDefault();
+        PeakActivityText = peak is null
+            ? "暂无数据"
+            : $"{peak.Hour:00}:00–{peak.Hour + 1:00}:00";
     }
 
     private static string FormatDuration(TimeSpan duration) =>

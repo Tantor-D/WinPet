@@ -306,6 +306,68 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
         }
     }
 
+    public async Task<IReadOnlyList<HourlyActivitySummary>>
+        GetHourlyActivityAsync(
+            DateOnly localDate,
+            CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var active = new long[24];
+            var idle = new long[24];
+            var overtime = new long[24];
+
+            await using var connection = await OpenConnectionAsync(
+                cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT
+                    bucket_started_utc,
+                    timezone_offset_minutes,
+                    active_milliseconds,
+                    idle_milliseconds,
+                    overtime_milliseconds
+                FROM activity_buckets
+                WHERE local_date = $localDate
+                ORDER BY bucket_started_utc;
+                """;
+            command.Parameters.AddWithValue(
+                "$localDate",
+                localDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+            await using var reader = await command
+                .ExecuteReaderAsync(cancellationToken)
+                .ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken)
+                       .ConfigureAwait(false))
+            {
+                var utc = DateTimeOffset.Parse(
+                    reader.GetString(0),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal);
+                var offset = TimeSpan.FromMinutes(reader.GetInt32(1));
+                var hour = utc.ToOffset(offset).Hour;
+                active[hour] += reader.GetInt64(2);
+                idle[hour] += reader.GetInt64(3);
+                overtime[hour] += reader.GetInt64(4);
+            }
+
+            return Enumerable.Range(0, 24)
+                .Select(hour => new HourlyActivitySummary(
+                    hour,
+                    TimeSpan.FromMilliseconds(active[hour]),
+                    TimeSpan.FromMilliseconds(idle[hour]),
+                    TimeSpan.FromMilliseconds(overtime[hour])))
+                .ToArray();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(
         CancellationToken cancellationToken)
     {
