@@ -4,7 +4,7 @@ namespace WinPet.Core.Sessions;
 
 public sealed class WorkSessionEngine
 {
-    private readonly WorkSessionSettings _settings;
+    private WorkSessionSettings _settings;
     private DateTimeOffset? _lastTimestamp;
     private TimeSpan _continuousWorkDuration;
     private TimeSpan _activeDuration;
@@ -95,6 +95,12 @@ public sealed class WorkSessionEngine
             timestamp,
             paused ? WorkSessionState.Paused : WorkSessionState.Working,
             false);
+    }
+
+    public void UpdateSettings(WorkSessionSettings settings)
+    {
+        settings.Validate();
+        _settings = settings;
     }
 
     private WorkSessionState DetermineState(ActivitySnapshot snapshot)

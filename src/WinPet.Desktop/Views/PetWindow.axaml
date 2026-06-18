@@ -1,0 +1,34 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WinPet.Desktop.ViewModels"
+        xmlns:controls="using:WinPet.Desktop.Controls"
+        x:Class="WinPet.Desktop.Views.PetWindow"
+        x:DataType="vm:PetWindowViewModel"
+        Width="230"
+        Height="270"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        Title="WinPet">
+    <Grid RowDefinitions="Auto,*">
+        <Border IsVisible="{Binding IsBubbleVisible}"
+                Margin="8,4,8,8"
+                Padding="12,9"
+                CornerRadius="14"
+                Background="#F2FFFFFF"
+                BorderBrush="#22000000"
+                BorderThickness="1">
+            <TextBlock Text="{Binding Message}"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"/>
+        </Border>
+
+        <controls:CodexPetSprite Grid.Row="1"
+                                 Width="192"
+                                 Height="208"
+                                 SourcePath="{Binding SpritesheetPath}"
+                                 AnimationRow="{Binding AnimationRow}"/>
+    </Grid>
+</Window>

@@ -1,46 +1,76 @@
 # WinPet
 
-WinPet 是一个以久坐提醒和电脑活动统计为核心的跨平台桌宠。
+WinPet 是一个 Windows 桌宠与久坐健康助手。它自动判断电脑活动情况，跟踪连续
+工作和有效休息，在需要离开电脑时提醒你，并用完全本地的数据生成日、周趋势。
 
-当前目标是先提供 Windows 版本，同时让核心逻辑、数据模型和 Avalonia UI
-可以在未来复用于 macOS。
+## 功能
+
+- Windows 键鼠空闲、锁屏、休眠和唤醒检测
+- 可配置最长工作时间、提前警告、有效休息和活动判定窗口
+- 自动重置、手动重置、暂停和延后 5/10/15 分钟
+- Windows 系统 Toast、应用内通知和桌宠气泡
+- 系统托盘、开机启动、启动时隐藏和单实例运行
+- SQLite 分钟桶、工作轮次、休息和提醒记录
+- 今日概览、24 小时分布、最近 14 天趋势和高峰时段
+- CSV ZIP 导出与带确认的历史数据清除
+- Windows x64 与 ARM64 自包含发布包
+
+## 完全兼容 Codex Pets
+
+WinPet 直接读取 Codex 的自定义宠物目录：
+
+```text
+${CODEX_HOME:-$HOME/.codex}/pets/<pet-name>/
+├── pet.json
+└── spritesheet.webp
+```
+
+图集、九行动画、帧数和逐帧时长遵循 Codex Pets 契约，不需要转换或复制社区资源。
+详见 [Codex Pets 兼容说明](docs/codex-pets-compatibility.md)。
+
+## 隐私
+
+WinPet 只读取“距上次键鼠输入经过多久”等系统状态，不记录按键内容、鼠标坐标、
+窗口标题、应用名称、文件内容或浏览记录。数据默认只保存在：
+
+```text
+%LOCALAPPDATA%\WinPet
+```
 
 ## 项目结构
 
-- `src/WinPet.Core`：计时状态机、领域模型、统计口径和平台接口。
-- `src/WinPet.Infrastructure`：SQLite、配置、主题加载和数据导出。
-- `src/WinPet.Platform.Windows`：Windows 活动、锁屏和休眠检测。
-- `src/WinPet.Desktop`：Avalonia 桌宠、托盘、设置和统计界面。
-- `tests/WinPet.Core.Tests`：核心业务规则测试。
-- `docs/implementation-plan.md`：详细实施计划。
+- `src/WinPet.Core`：状态机、模型和跨平台接口
+- `src/WinPet.Infrastructure`：SQLite、JSON 设置、Codex Pets 加载和导出
+- `src/WinPet.Platform.Windows`：Windows 活动、通知和开机启动
+- `src/WinPet.Desktop`：Avalonia 桌宠、托盘、设置和统计界面
+- `tests`：核心、数据层和 Windows 集成测试
 
-## 隐私原则
+## 开发
 
-WinPet 只读取“距上次键鼠输入经过多久”等系统级状态，不记录按键内容、
-鼠标坐标、窗口标题或文件内容。统计数据默认仅保存在本机。
-
-## 当前进度
-
-- 已完成跨平台分层和核心工作/休息状态机。
-- 已完成 Windows 键鼠空闲、锁屏和休眠检测。
-- 已完成活动监测后台循环和实时诊断界面。
-- 已接入 SQLite 分钟活动桶，并可重新计算每日活跃、空闲、锁屏、
-  休眠和超时汇总。
-- 已记录完整工作轮次、有效休息、提醒事件和手动重置原因。
-- 已提供实时状态、今日统计和 24 小时活跃分布视图。
-- 桌宠主题、系统托盘和周/月趋势仍在开发中。
-
-## 本地运行
-
-需要 .NET 8 SDK：
+需要 .NET 8 SDK 和 Windows 10 19041 或更高版本的 SDK。
 
 ```powershell
 dotnet restore WinPet.sln --configfile NuGet.Config
+dotnet build WinPet.sln --no-restore
+dotnet test WinPet.sln --no-restore
+./scripts/check-vulnerabilities.ps1
 dotnet run --project src/WinPet.Desktop
 ```
 
-运行测试：
+## 发布
 
 ```powershell
-dotnet test WinPet.sln
+./scripts/publish-windows.ps1 -RuntimeIdentifier win-x64 -Version 0.1.0
 ```
+
+产物会写入 `artifacts/`。GitHub Actions 也支持手动生成 x64 和 ARM64 包。
+
+## macOS
+
+业务规则、数据格式、Codex Pets 契约和大部分 Avalonia UI 都不依赖 Win32。
+Windows 平台能力已通过接口隔离，为后续 macOS 活动检测、菜单栏通知和登录项适配
+保留了边界。当前发布版本仅支持 Windows。
+
+## License
+
+MIT

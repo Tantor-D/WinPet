@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore WinPet.sln --configfile NuGet.Config
+
+      - name: Build
+        run: dotnet build WinPet.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test WinPet.sln --configuration Release --no-build
+
+      - name: Dependency vulnerability scan
+        shell: pwsh
+        run: ./scripts/check-vulnerabilities.ps1

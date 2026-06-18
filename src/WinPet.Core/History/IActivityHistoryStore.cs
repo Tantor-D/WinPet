@@ -27,4 +27,9 @@ public interface IActivityHistoryStore
     Task<IReadOnlyList<HourlyActivitySummary>> GetHourlyActivityAsync(
         DateOnly localDate,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DailyTrendPoint>> GetDailyTrendAsync(
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default);
 }

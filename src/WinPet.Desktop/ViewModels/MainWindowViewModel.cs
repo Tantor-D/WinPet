@@ -54,10 +54,30 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _peakActivityText = "暂无数据";
 
+    [ObservableProperty]
+    private string _lastSevenDaysText = "00:00:00";
+
+    [ObservableProperty]
+    private string _dailyAverageText = "00:00:00";
+
+    [ObservableProperty]
+    private string _dataStatusText = string.Empty;
+
     public ObservableCollection<HourlyActivityBarViewModel> HourlyActivityBars
     {
         get;
     } = [];
+
+    public ObservableCollection<DailyTrendBarViewModel> DailyTrendBars
+    {
+        get;
+    } = [];
+
+    public event EventHandler? OpenSettingsRequested;
+
+    public event EventHandler? TogglePetRequested;
+
+    public event EventHandler? ClearDataRequested;
 
     public MainWindowViewModel()
     {
@@ -69,6 +89,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _trackingService.Updated += OnTrackingUpdated;
         _trackingService.TodaySummaryUpdated += OnTodaySummaryUpdated;
         _trackingService.TodayTimelineUpdated += OnTodayTimelineUpdated;
+        _trackingService.TrendUpdated += OnTrendUpdated;
         _trackingService.Start();
     }
 
@@ -83,6 +104,59 @@ public partial class MainWindowViewModel : ViewModelBase
         ApplyUpdate(await _trackingService.ResetAsync());
     }
 
+    [RelayCommand]
+    private void TogglePause()
+    {
+        if (_trackingService is null)
+        {
+            return;
+        }
+
+        ApplyUpdate(_trackingService.TogglePause());
+    }
+
+    [RelayCommand]
+    private void OpenSettings() =>
+        OpenSettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void TogglePet() =>
+        TogglePetRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private async Task ExportDataAsync()
+    {
+        if (_trackingService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var path = await _trackingService.ExportDataAsync();
+            DataStatusText = $"已导出：{path}";
+        }
+        catch (IOException)
+        {
+            DataStatusText = "导出失败，请检查文档目录权限";
+        }
+    }
+
+    [RelayCommand]
+    private void RequestClearData() =>
+        ClearDataRequested?.Invoke(this, EventArgs.Empty);
+
+    public async Task ClearDataAsync()
+    {
+        if (_trackingService is null)
+        {
+            return;
+        }
+
+        await _trackingService.ClearDataAsync();
+        DataStatusText = "历史数据已清除";
+    }
+
     private void OnTrackingUpdated(object? sender, WorkSessionUpdate update) =>
         Dispatcher.UIThread.Post(() => ApplyUpdate(update));
 
@@ -95,6 +169,11 @@ public partial class MainWindowViewModel : ViewModelBase
         object? sender,
         IReadOnlyList<HourlyActivitySummary> timeline) =>
         Dispatcher.UIThread.Post(() => ApplyTodayTimeline(timeline));
+
+    private void OnTrendUpdated(
+        object? sender,
+        IReadOnlyList<DailyTrendPoint> trend) =>
+        Dispatcher.UIThread.Post(() => ApplyTrend(trend));
 
     private void ApplyUpdate(WorkSessionUpdate update)
     {
@@ -157,6 +236,32 @@ public partial class MainWindowViewModel : ViewModelBase
         PeakActivityText = peak is null
             ? "暂无数据"
             : $"{peak.Hour:00}:00–{peak.Hour + 1:00}:00";
+    }
+
+    private void ApplyTrend(IReadOnlyList<DailyTrendPoint> trend)
+    {
+        var maximum = trend.Max(point => point.ActiveDuration.TotalSeconds);
+        DailyTrendBars.Clear();
+        foreach (var point in trend)
+        {
+            var height = maximum <= 0
+                ? 3
+                : 3 + (97 * point.ActiveDuration.TotalSeconds / maximum);
+            DailyTrendBars.Add(
+                new DailyTrendBarViewModel(
+                    point.Date.ToString("MM/dd"),
+                    height,
+                    $"{point.Date:yyyy-MM-dd} · " +
+                    $"活跃 {FormatDuration(point.ActiveDuration)}"));
+        }
+
+        var recent = trend.TakeLast(7).ToArray();
+        var total = recent.Aggregate(
+            TimeSpan.Zero,
+            (sum, point) => sum + point.ActiveDuration);
+        LastSevenDaysText = FormatDuration(total);
+        DailyAverageText = FormatDuration(
+            TimeSpan.FromTicks(total.Ticks / Math.Max(1, recent.Length)));
     }
 
     private static string FormatDuration(TimeSpan duration) =>

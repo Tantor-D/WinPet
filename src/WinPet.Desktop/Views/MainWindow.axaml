@@ -8,7 +8,7 @@
         d:DesignHeight="760"
         x:Class="WinPet.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
+        Icon="/Assets/winpet-icon.ico"
         Width="620"
         Height="760"
         MinWidth="500"
@@ -200,10 +200,93 @@
                 </Border>
             </StackPanel>
 
-            <Button HorizontalAlignment="Stretch"
-                    Padding="16,12"
-                    Command="{Binding ResetSessionCommand}"
-                    Content="重置本轮工作时间"/>
+            <StackPanel Spacing="12">
+                <TextBlock FontSize="22"
+                           FontWeight="SemiBold"
+                           Text="最近 14 天"/>
+                <Grid ColumnDefinitions="*,12,*">
+                    <Border Padding="14"
+                            CornerRadius="12"
+                            Background="#F7F8FA">
+                        <StackPanel Spacing="4">
+                            <TextBlock Foreground="#697386"
+                                       Text="近 7 天活跃"/>
+                            <TextBlock FontFamily="Consolas"
+                                       FontSize="20"
+                                       Text="{Binding LastSevenDaysText}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2"
+                            Padding="14"
+                            CornerRadius="12"
+                            Background="#F7F8FA">
+                        <StackPanel Spacing="4">
+                            <TextBlock Foreground="#697386"
+                                       Text="日均活跃"/>
+                            <TextBlock FontFamily="Consolas"
+                                       FontSize="20"
+                                       Text="{Binding DailyAverageText}"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+                <Border Padding="18"
+                        CornerRadius="14"
+                        Background="#F7F8FA">
+                    <ItemsControl ItemsSource="{Binding DailyTrendBars}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <UniformGrid Rows="1" Columns="14"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DailyTrendBarViewModel">
+                                <Grid Height="130"
+                                      RowDefinitions="100,30"
+                                      ToolTip.Tip="{Binding Tooltip}">
+                                    <Border Width="18"
+                                            Height="{Binding BarHeight}"
+                                            MaxHeight="100"
+                                            VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Center"
+                                            CornerRadius="5,5,1,1"
+                                            Background="#75C99A"/>
+                                    <TextBlock Grid.Row="1"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Bottom"
+                                               FontSize="9"
+                                               Text="{Binding Label}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
+            <Grid ColumnDefinitions="*,10,*,10,*">
+                <Button Padding="12"
+                        Command="{Binding ResetSessionCommand}"
+                        Content="重置计时"/>
+                <Button Grid.Column="2"
+                        Padding="12"
+                        Command="{Binding TogglePauseCommand}"
+                        Content="暂停 / 继续"/>
+                <Button Grid.Column="4"
+                        Padding="12"
+                        Command="{Binding OpenSettingsCommand}"
+                        Content="设置"/>
+            </Grid>
+            <Grid ColumnDefinitions="*,10,*">
+                <Button Padding="12"
+                        Command="{Binding ExportDataCommand}"
+                        Content="导出 CSV 压缩包"/>
+                <Button Grid.Column="2"
+                        Padding="12"
+                        Command="{Binding RequestClearDataCommand}"
+                        Content="清除全部历史"/>
+            </Grid>
+            <TextBlock Foreground="#697386"
+                       TextWrapping="Wrap"
+                       Text="{Binding DataStatusText}"/>
         </StackPanel>
     </ScrollViewer>
 </Window>

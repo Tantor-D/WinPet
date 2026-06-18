@@ -1,0 +1,47 @@
+name: Package Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version
+        required: true
+        default: 0.1.0
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  package:
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          if (-not $version) {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Package
+        shell: pwsh
+        run: >
+          ./scripts/publish-windows.ps1
+          -RuntimeIdentifier ${{ matrix.rid }}
+          -Version ${{ steps.version.outputs.value }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinPet-${{ matrix.rid }}
+          path: artifacts/*.zip

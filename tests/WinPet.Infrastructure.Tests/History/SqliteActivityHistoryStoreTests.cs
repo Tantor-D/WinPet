@@ -59,6 +59,14 @@ public sealed class SqliteActivityHistoryStoreTests
                 timeline.Aggregate(
                     TimeSpan.Zero,
                     (total, point) => total + point.IdleDuration));
+
+            var trend = await store.GetDailyTrendAsync(
+                localDate.AddDays(-1),
+                localDate);
+            Assert.Equal(2, trend.Count);
+            Assert.Equal(
+                TimeSpan.FromSeconds(30),
+                trend[^1].ActiveDuration);
         }
         finally
         {
@@ -136,12 +144,15 @@ public sealed class SqliteActivityHistoryStoreTests
                         start.AddMinutes(minute),
                         TimeSpan.Zero));
             }
-            await RecordAsync(
-                store,
-                engine,
-                new ActivitySnapshot(
-                    start.AddMinutes(35),
-                    TimeSpan.FromMinutes(5)));
+            for (var minute = 31; minute <= 35; minute++)
+            {
+                await RecordAsync(
+                    store,
+                    engine,
+                    new ActivitySnapshot(
+                        start.AddMinutes(minute),
+                        TimeSpan.FromMinutes(minute - 30)));
+            }
             await RecordAsync(
                 store,
                 engine,
@@ -249,6 +260,56 @@ public sealed class SqliteActivityHistoryStoreTests
         finally
         {
             DeleteDatabase(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task Exports_all_history_tables_and_can_clear_data()
+    {
+        var databasePath = CreateDatabasePath();
+        var exportDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "WinPet.Tests",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var settings = new WorkSessionSettings();
+            var store = new SqliteActivityHistoryStore(
+                databasePath,
+                settings);
+            await store.InitializeAsync();
+            var start = DateTimeOffset.Now;
+            await store.RecordAsync(
+                new ActivitySnapshot(start, TimeSpan.Zero),
+                Update(start, WorkSessionState.Working));
+            await store.RecordAsync(
+                new ActivitySnapshot(start.AddSeconds(10), TimeSpan.Zero),
+                Update(start.AddSeconds(10), WorkSessionState.Working));
+
+            var archive = await store.ExportCsvArchiveAsync(exportDirectory);
+            Assert.True(File.Exists(archive));
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(archive))
+            {
+                Assert.Contains(
+                    zip.Entries,
+                    entry => entry.Name == "activity_buckets.csv");
+                Assert.Contains(
+                    zip.Entries,
+                    entry => entry.Name == "work_sessions.csv");
+            }
+
+            await store.ClearAllAsync();
+            var summary = await store.GetDailySummaryAsync(
+                DateOnly.FromDateTime(start.LocalDateTime));
+            Assert.Equal(TimeSpan.Zero, summary.ActiveDuration);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+            if (Directory.Exists(exportDirectory))
+            {
+                Directory.Delete(exportDirectory, recursive: true);
+            }
         }
     }
 

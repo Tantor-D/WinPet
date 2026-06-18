@@ -1,0 +1,94 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WinPet.Desktop.ViewModels"
+        xmlns:pets="using:WinPet.Core.Pets"
+        x:Class="WinPet.Desktop.Views.SettingsWindow"
+        x:DataType="vm:SettingsWindowViewModel"
+        Width="480"
+        Height="620"
+        MinWidth="420"
+        Title="WinPet 设置"
+        WindowStartupLocation="CenterOwner">
+    <ScrollViewer>
+        <StackPanel Margin="28" Spacing="22">
+            <TextBlock FontSize="28"
+                       FontWeight="SemiBold"
+                       Text="设置"/>
+
+            <StackPanel Spacing="12">
+                <TextBlock FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="工作与休息"/>
+                <Grid ColumnDefinitions="*,120"
+                      RowDefinitions="Auto,12,Auto,12,Auto,12,Auto">
+                    <TextBlock VerticalAlignment="Center"
+                               Text="最长连续工作（分钟）"/>
+                    <NumericUpDown Grid.Column="1"
+                                   Minimum="5"
+                                   Maximum="240"
+                                   Value="{Binding MaximumWorkMinutes}"/>
+                    <TextBlock Grid.Row="2"
+                               VerticalAlignment="Center"
+                               Text="提前警告（分钟）"/>
+                    <NumericUpDown Grid.Row="2"
+                                   Grid.Column="1"
+                                   Minimum="0"
+                                   Maximum="120"
+                                   Value="{Binding WarningLeadMinutes}"/>
+                    <TextBlock Grid.Row="4"
+                               VerticalAlignment="Center"
+                               Text="有效休息（分钟）"/>
+                    <NumericUpDown Grid.Row="4"
+                                   Grid.Column="1"
+                                   Minimum="1"
+                                   Maximum="60"
+                                   Value="{Binding QualifiedBreakMinutes}"/>
+                    <TextBlock Grid.Row="6"
+                               VerticalAlignment="Center"
+                               Text="活动判定窗口（秒）"/>
+                    <NumericUpDown Grid.Row="6"
+                                   Grid.Column="1"
+                                   Minimum="10"
+                                   Maximum="600"
+                                   Value="{Binding ActiveInputSeconds}"/>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="12">
+                <TextBlock FontSize="18"
+                           FontWeight="SemiBold"
+                           Text="桌宠与提醒"/>
+                <CheckBox Content="显示桌宠"
+                          IsChecked="{Binding PetEnabled}"/>
+                <CheckBox Content="桌宠保持置顶"
+                          IsChecked="{Binding PetAlwaysOnTop}"/>
+                <CheckBox Content="启用提醒通知"
+                          IsChecked="{Binding NotificationsEnabled}"/>
+                <CheckBox Content="启动时隐藏统计面板"
+                          IsChecked="{Binding StartMinimized}"/>
+                <CheckBox Content="登录 Windows 后自动启动"
+                          IsChecked="{Binding LaunchAtStartup}"/>
+                <Grid ColumnDefinitions="*,220">
+                    <TextBlock VerticalAlignment="Center"
+                               Text="Codex 桌宠"/>
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding AvailablePets}"
+                              SelectedValue="{Binding ThemeName}"
+                              SelectedValueBinding="{Binding Manifest.Id}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="pets:CodexPetDefinition">
+                                <TextBlock Text="{Binding Manifest.DisplayName}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+            </StackPanel>
+
+            <Button Padding="16,12"
+                    Command="{Binding SaveCommand}"
+                    Content="保存设置"/>
+            <TextBlock Foreground="#52705A"
+                       Text="{Binding StatusText}"/>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

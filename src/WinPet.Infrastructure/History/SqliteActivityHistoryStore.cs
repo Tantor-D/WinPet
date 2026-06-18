@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.IO.Compression;
+using System.Text;
 using Microsoft.Data.Sqlite;
 using WinPet.Core.Activity;
 using WinPet.Core.History;
@@ -6,11 +8,13 @@ using WinPet.Core.Sessions;
 
 namespace WinPet.Infrastructure.History;
 
-public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
+public sealed class SqliteActivityHistoryStore :
+    IActivityHistoryStore,
+    IActivityDataManager
 {
     private const int SchemaVersion = 2;
     private readonly string _connectionString;
-    private readonly WorkSessionSettings _settings;
+    private WorkSessionSettings _settings;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DateTimeOffset? _lastRecordedAt;
     private WorkSessionState? _lastSessionState;
@@ -126,6 +130,12 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
         {
             _gate.Release();
         }
+    }
+
+    public void UpdateSettings(WorkSessionSettings settings)
+    {
+        settings.Validate();
+        _settings = settings;
     }
 
     public async Task RecordAsync(
@@ -266,7 +276,20 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
                     ),
                     (
                         SELECT COALESCE(
-                            MAX(active_milliseconds + idle_milliseconds),
+                            MAX(
+                                CASE
+                                    WHEN ended_at_utc IS NOT NULL THEN
+                                        CAST(ROUND(
+                                            (
+                                                julianday(ended_at_utc) -
+                                                julianday(started_at_utc)
+                                            ) * 86400000
+                                        ) AS INTEGER)
+                                    ELSE
+                                        active_milliseconds +
+                                        idle_milliseconds
+                                END
+                            ),
                             0)
                         FROM work_sessions
                         WHERE local_date = $localDate
@@ -361,6 +384,111 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
                     TimeSpan.FromMilliseconds(idle[hour]),
                     TimeSpan.FromMilliseconds(overtime[hour])))
                 .ToArray();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<DailyTrendPoint>> GetDailyTrendAsync(
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        if (endDate < startDate)
+        {
+            throw new ArgumentOutOfRangeException(nameof(endDate));
+        }
+
+        var points = new List<DailyTrendPoint>();
+        for (var date = startDate;
+             date <= endDate;
+             date = date.AddDays(1))
+        {
+            var summary = await GetDailySummaryAsync(
+                date,
+                cancellationToken).ConfigureAwait(false);
+            points.Add(new DailyTrendPoint(
+                date,
+                summary.ActiveDuration,
+                summary.ComputerDuration,
+                summary.OvertimeDuration,
+                summary.QualifiedBreaks));
+        }
+
+        return points;
+    }
+
+    public async Task<string> ExportCsvArchiveAsync(
+        string outputDirectory,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        Directory.CreateDirectory(outputDirectory);
+        var exportName = $"WinPet-{DateTime.Now:yyyyMMdd-HHmmss}";
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            exportName + "-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(
+                cancellationToken).ConfigureAwait(false);
+            foreach (var table in new[]
+                     {
+                         "activity_buckets",
+                         "work_sessions",
+                         "rest_sessions",
+                         "reminder_events",
+                     })
+            {
+                await ExportTableAsync(
+                    connection,
+                    table,
+                    Path.Combine(temporaryDirectory, table + ".csv"),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        var archivePath = Path.Combine(outputDirectory, exportName + ".zip");
+        try
+        {
+            ZipFile.CreateFromDirectory(temporaryDirectory, archivePath);
+            return archivePath;
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
+        }
+    }
+
+    public async Task ClearAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(
+                cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                DELETE FROM activity_buckets;
+                DELETE FROM work_sessions;
+                DELETE FROM rest_sessions;
+                DELETE FROM reminder_events;
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken)
+                .ConfigureAwait(false);
+            _lastRecordedAt = null;
+            _lastSessionState = null;
         }
         finally
         {
@@ -504,6 +632,21 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
         {
             var breakStartedAt =
                 snapshot.Timestamp - session.CurrentBreakDuration;
+            var currentSegmentDuration = _lastRecordedAt is { } last
+                ? snapshot.Timestamp - last
+                : TimeSpan.Zero;
+            var priorBreakDuration =
+                session.CurrentBreakDuration - currentSegmentDuration;
+            if (priorBreakDuration < TimeSpan.Zero)
+            {
+                priorBreakDuration = TimeSpan.Zero;
+            }
+
+            await ReclassifyOpenWorkIdleAsync(
+                connection,
+                transaction,
+                priorBreakDuration,
+                cancellationToken).ConfigureAwait(false);
             await CloseOpenWorkSessionAsync(
                 connection,
                 transaction,
@@ -514,6 +657,7 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
                 connection,
                 transaction,
                 breakStartedAt,
+                priorBreakDuration,
                 cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -708,6 +852,7 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
         SqliteConnection connection,
         SqliteTransaction transaction,
         DateTimeOffset timestamp,
+        TimeSpan initialDuration,
         CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
@@ -717,9 +862,10 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
             INSERT INTO rest_sessions (
                 started_at_utc,
                 local_date,
+                duration_milliseconds,
                 qualified
             )
-            SELECT $startedAtUtc, $localDate, 1
+            SELECT $startedAtUtc, $localDate, $duration, 1
             WHERE NOT EXISTS (
                 SELECT 1 FROM rest_sessions
                 WHERE ended_at_utc IS NULL
@@ -727,6 +873,33 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
             """;
         command.Parameters.AddWithValue("$startedAtUtc", ToUtcText(timestamp));
         command.Parameters.AddWithValue("$localDate", ToLocalDateText(timestamp));
+        command.Parameters.AddWithValue(
+            "$duration",
+            ToMilliseconds(initialDuration));
+        await command.ExecuteNonQueryAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task ReclassifyOpenWorkIdleAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        TimeSpan duration,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE work_sessions
+            SET idle_milliseconds = MAX(
+                0,
+                idle_milliseconds - $duration
+            )
+            WHERE ended_at_utc IS NULL;
+            """;
+        command.Parameters.AddWithValue(
+            "$duration",
+            ToMilliseconds(duration));
         await command.ExecuteNonQueryAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -854,6 +1027,43 @@ public sealed class SqliteActivityHistoryStore : IActivityHistoryStore
     private static string ToLocalDateText(DateTimeOffset timestamp) =>
         DateOnly.FromDateTime(timestamp.ToLocalTime().DateTime)
             .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static async Task ExportTableAsync(
+        SqliteConnection connection,
+        string table,
+        string outputPath,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT * FROM {table};";
+        await using var reader = await command
+            .ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await using var writer = new StreamWriter(
+            outputPath,
+            append: false,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+
+        var headers = Enumerable.Range(0, reader.FieldCount)
+            .Select(reader.GetName);
+        await writer.WriteLineAsync(
+            string.Join(",", headers.Select(EscapeCsv)));
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            var values = Enumerable.Range(0, reader.FieldCount)
+                .Select(index => reader.IsDBNull(index)
+                    ? string.Empty
+                    : Convert.ToString(
+                        reader.GetValue(index),
+                        CultureInfo.InvariantCulture) ?? string.Empty);
+            await writer.WriteLineAsync(
+                string.Join(",", values.Select(EscapeCsv)));
+        }
+    }
+
+    private static string EscapeCsv(string value) =>
+        $"\"{value.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
     private static DateTimeOffset FloorToMinute(DateTimeOffset timestamp) =>
         new(

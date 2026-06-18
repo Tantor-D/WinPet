@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="WinPet.Desktop.Views.ConfirmationWindow"
+        Width="410"
+        Height="230"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Title="确认清除数据">
+    <StackPanel Margin="28" Spacing="20">
+        <TextBlock FontSize="23"
+                   FontWeight="SemiBold"
+                   Text="清除全部统计数据？"/>
+        <TextBlock TextWrapping="Wrap"
+                   Text="分钟记录、工作轮次、休息和提醒历史都会被永久删除。设置和桌宠不会受影响。"/>
+        <Grid ColumnDefinitions="*,12,*">
+            <Button Name="CancelButton"
+                    Padding="14,10"
+                    Content="取消"/>
+            <Button Name="ConfirmButton"
+                    Grid.Column="2"
+                    Padding="14,10"
+                    Content="确认清除"/>
+        </Grid>
+    </StackPanel>
+</Window>
