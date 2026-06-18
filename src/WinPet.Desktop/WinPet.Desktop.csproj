@@ -9,6 +9,7 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained Condition="'$(RuntimeIdentifier)' != ''">true</WindowsAppSDKSelfContained>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <AssemblyName>WinPet</AssemblyName>
     <Product>WinPet</Product>
     <Version>0.1.0</Version>
