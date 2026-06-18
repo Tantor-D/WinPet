@@ -24,14 +24,23 @@ public sealed class ActivityTrackingService : IAsyncDisposable
 
     public event EventHandler<WorkSessionUpdate>? Updated;
 
+    public event EventHandler<DailyActivitySummary>? TodaySummaryUpdated;
+
     public void Start()
     {
         _monitoringTask ??= MonitorAsync(_stopping.Token);
     }
 
-    public WorkSessionUpdate Reset()
+    public async Task<WorkSessionUpdate> ResetAsync()
     {
-        var update = _sessionEngine.Reset(DateTimeOffset.UtcNow);
+        var timestamp = DateTimeOffset.UtcNow;
+        if (_historyStore is not null)
+        {
+            await _historyStore.RecordManualResetAsync(timestamp)
+                .ConfigureAwait(false);
+        }
+
+        var update = _sessionEngine.Reset(timestamp);
         Updated?.Invoke(this, update);
         return update;
     }
@@ -49,6 +58,12 @@ public sealed class ActivityTrackingService : IAsyncDisposable
             catch (OperationCanceledException)
             {
             }
+        }
+
+        if (_historyStore is not null)
+        {
+            await _historyStore.RecordApplicationStoppedAsync(
+                DateTimeOffset.UtcNow).ConfigureAwait(false);
         }
 
         _stopping.Dispose();
@@ -71,6 +86,11 @@ public sealed class ActivityTrackingService : IAsyncDisposable
                     snapshot,
                     update,
                     cancellationToken).ConfigureAwait(false);
+                var today = await _historyStore.GetDailySummaryAsync(
+                    DateOnly.FromDateTime(
+                        snapshot.Timestamp.ToLocalTime().DateTime),
+                    cancellationToken).ConfigureAwait(false);
+                TodaySummaryUpdated?.Invoke(this, today);
             }
 
             Updated?.Invoke(this, update);

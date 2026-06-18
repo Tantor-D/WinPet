@@ -12,6 +12,14 @@ public interface IActivityHistoryStore
         WorkSessionUpdate session,
         CancellationToken cancellationToken = default);
 
+    Task RecordManualResetAsync(
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken = default);
+
+    Task RecordApplicationStoppedAsync(
+        DateTimeOffset timestamp,
+        CancellationToken cancellationToken = default);
+
     Task<DailyActivitySummary> GetDailySummaryAsync(
         DateOnly localDate,
         CancellationToken cancellationToken = default);

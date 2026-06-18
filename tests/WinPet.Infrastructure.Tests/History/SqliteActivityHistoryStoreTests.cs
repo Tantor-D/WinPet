@@ -89,6 +89,156 @@ public sealed class SqliteActivityHistoryStoreTests
         }
     }
 
+    [Fact]
+    public async Task Qualified_break_closes_work_and_records_rest_session()
+    {
+        var databasePath = CreateDatabasePath();
+        try
+        {
+            var settings = new WorkSessionSettings();
+            var store = new SqliteActivityHistoryStore(
+                databasePath,
+                settings);
+            await store.InitializeAsync();
+            var engine = new WorkSessionEngine(settings);
+            var start = new DateTimeOffset(
+                2026,
+                6,
+                18,
+                9,
+                0,
+                0,
+                TimeSpan.Zero);
+
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(start, TimeSpan.Zero));
+            for (var minute = 5; minute <= 30; minute += 5)
+            {
+                await RecordAsync(
+                    store,
+                    engine,
+                    new ActivitySnapshot(
+                        start.AddMinutes(minute),
+                        TimeSpan.Zero));
+            }
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(
+                    start.AddMinutes(35),
+                    TimeSpan.FromMinutes(5)));
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(
+                    start.AddMinutes(36),
+                    TimeSpan.Zero));
+
+            var summary = await store.GetDailySummaryAsync(
+                DateOnly.FromDateTime(start.ToLocalTime().DateTime));
+
+            Assert.Equal(1, summary.CompletedWorkSessions);
+            Assert.Equal(1, summary.QualifiedBreaks);
+            Assert.Equal(
+                TimeSpan.FromMinutes(30),
+                summary.LongestWorkSession);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task Manual_reset_finishes_current_work_session()
+    {
+        var databasePath = CreateDatabasePath();
+        try
+        {
+            var settings = new WorkSessionSettings();
+            var store = new SqliteActivityHistoryStore(
+                databasePath,
+                settings);
+            await store.InitializeAsync();
+            var start = DateTimeOffset.Now;
+
+            await store.RecordAsync(
+                new ActivitySnapshot(start, TimeSpan.Zero),
+                Update(start, WorkSessionState.Working));
+            for (var minute = 5; minute <= 20; minute += 5)
+            {
+                await store.RecordAsync(
+                    new ActivitySnapshot(
+                        start.AddMinutes(minute),
+                        TimeSpan.Zero),
+                    Update(
+                        start.AddMinutes(minute),
+                        WorkSessionState.Working));
+            }
+            await store.RecordManualResetAsync(start.AddMinutes(20));
+
+            var summary = await store.GetDailySummaryAsync(
+                DateOnly.FromDateTime(start.LocalDateTime));
+
+            Assert.Equal(1, summary.CompletedWorkSessions);
+            Assert.Equal(
+                TimeSpan.FromMinutes(20),
+                summary.LongestWorkSession);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task Warning_and_break_due_transitions_are_counted_as_reminders()
+    {
+        var databasePath = CreateDatabasePath();
+        try
+        {
+            var settings = new WorkSessionSettings
+            {
+                MaximumWorkDuration = TimeSpan.FromMinutes(10),
+                WarningLeadTime = TimeSpan.FromMinutes(2),
+            };
+            var store = new SqliteActivityHistoryStore(
+                databasePath,
+                settings);
+            await store.InitializeAsync();
+            var engine = new WorkSessionEngine(settings);
+            var start = DateTimeOffset.Now;
+
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(start, TimeSpan.Zero));
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(
+                    start.AddMinutes(8),
+                    TimeSpan.Zero));
+            await RecordAsync(
+                store,
+                engine,
+                new ActivitySnapshot(
+                    start.AddMinutes(10),
+                    TimeSpan.Zero));
+
+            var summary = await store.GetDailySummaryAsync(
+                DateOnly.FromDateTime(start.LocalDateTime));
+
+            Assert.Equal(2, summary.ReminderCount);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
     private static WorkSessionUpdate Update(
         DateTimeOffset timestamp,
         WorkSessionState state) =>
@@ -100,6 +250,15 @@ public sealed class SqliteActivityHistoryStoreTests
             TimeSpan.Zero,
             TimeSpan.Zero,
             QualifiedBreakCompleted: false);
+
+    private static async Task RecordAsync(
+        SqliteActivityHistoryStore store,
+        WorkSessionEngine engine,
+        ActivitySnapshot snapshot)
+    {
+        var update = engine.Process(snapshot);
+        await store.RecordAsync(snapshot, update);
+    }
 
     private static string CreateDatabasePath()
     {

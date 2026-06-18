@@ -6,7 +6,11 @@ public sealed record DailyActivitySummary(
     TimeSpan IdleDuration,
     TimeSpan LockedDuration,
     TimeSpan SuspendedDuration,
-    TimeSpan OvertimeDuration)
+    TimeSpan OvertimeDuration,
+    int CompletedWorkSessions,
+    int QualifiedBreaks,
+    TimeSpan LongestWorkSession,
+    int ReminderCount)
 {
     public TimeSpan ComputerDuration => ActiveDuration + IdleDuration;
 }

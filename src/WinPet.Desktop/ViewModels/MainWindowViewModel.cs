@@ -1,6 +1,7 @@
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WinPet.Core.History;
 using WinPet.Core.Sessions;
 using WinPet.Desktop.Services;
 
@@ -28,6 +29,27 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string _lastUpdatedText = "等待首次采样";
 
+    [ObservableProperty]
+    private string _todayComputerText = "00:00:00";
+
+    [ObservableProperty]
+    private string _todayActiveText = "00:00:00";
+
+    [ObservableProperty]
+    private string _todayLongestText = "00:00:00";
+
+    [ObservableProperty]
+    private string _todaySessionsText = "0";
+
+    [ObservableProperty]
+    private string _todayBreaksText = "0";
+
+    [ObservableProperty]
+    private string _todayOvertimeText = "00:00:00";
+
+    [ObservableProperty]
+    private string _todayRemindersText = "0";
+
     public MainWindowViewModel()
     {
     }
@@ -36,22 +58,28 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _trackingService = trackingService;
         _trackingService.Updated += OnTrackingUpdated;
+        _trackingService.TodaySummaryUpdated += OnTodaySummaryUpdated;
         _trackingService.Start();
     }
 
     [RelayCommand]
-    private void ResetSession()
+    private async Task ResetSessionAsync()
     {
         if (_trackingService is null)
         {
             return;
         }
 
-        ApplyUpdate(_trackingService.Reset());
+        ApplyUpdate(await _trackingService.ResetAsync());
     }
 
     private void OnTrackingUpdated(object? sender, WorkSessionUpdate update) =>
         Dispatcher.UIThread.Post(() => ApplyUpdate(update));
+
+    private void OnTodaySummaryUpdated(
+        object? sender,
+        DailyActivitySummary summary) =>
+        Dispatcher.UIThread.Post(() => ApplyTodaySummary(summary));
 
     private void ApplyUpdate(WorkSessionUpdate update)
     {
@@ -71,6 +99,17 @@ public partial class MainWindowViewModel : ViewModelBase
         BreakTimeText = FormatDuration(update.CurrentBreakDuration);
         OvertimeText = FormatDuration(update.OvertimeDuration);
         LastUpdatedText = $"最后采样：{update.Timestamp.ToLocalTime():HH:mm:ss}";
+    }
+
+    private void ApplyTodaySummary(DailyActivitySummary summary)
+    {
+        TodayComputerText = FormatDuration(summary.ComputerDuration);
+        TodayActiveText = FormatDuration(summary.ActiveDuration);
+        TodayLongestText = FormatDuration(summary.LongestWorkSession);
+        TodaySessionsText = summary.CompletedWorkSessions.ToString();
+        TodayBreaksText = summary.QualifiedBreaks.ToString();
+        TodayOvertimeText = FormatDuration(summary.OvertimeDuration);
+        TodayRemindersText = summary.ReminderCount.ToString();
     }
 
     private static string FormatDuration(TimeSpan duration) =>
