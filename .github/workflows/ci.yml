@@ -9,6 +9,7 @@ on:
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +24,24 @@ jobs:
         run: dotnet build WinPet.sln --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test WinPet.sln --configuration Release --no-build
+        shell: pwsh
+        run: |
+          $projects = @(
+            "tests/WinPet.Core.Tests/WinPet.Core.Tests.csproj",
+            "tests/WinPet.Infrastructure.Tests/WinPet.Infrastructure.Tests.csproj",
+            "tests/WinPet.Platform.Windows.Tests/WinPet.Platform.Windows.Tests.csproj",
+            "tests/WinPet.Desktop.Tests/WinPet.Desktop.Tests.csproj"
+          )
+          foreach ($project in $projects) {
+            dotnet test $project `
+              --configuration Release `
+              --no-build `
+              --no-restore `
+              --blame-hang-timeout 2m
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
 
       - name: Dependency vulnerability scan
         shell: pwsh
