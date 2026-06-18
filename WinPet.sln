@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinPet.Core.Tests", "tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinPet.Platform.Windows.Tests", "tests\WinPet.Platform.Windows.Tests\WinPet.Platform.Windows.Tests.csproj", "{CA084378-82CC-45BC-AE9B-7919848DDCA5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WinPet.Infrastructure.Tests", "tests\WinPet.Infrastructure.Tests\WinPet.Infrastructure.Tests.csproj", "{7BF6385A-C447-42C6-AADC-5EF52222A256}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{CA084378-82CC-45BC-AE9B-7919848DDCA5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA084378-82CC-45BC-AE9B-7919848DDCA5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA084378-82CC-45BC-AE9B-7919848DDCA5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7BF6385A-C447-42C6-AADC-5EF52222A256}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7BF6385A-C447-42C6-AADC-5EF52222A256}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7BF6385A-C447-42C6-AADC-5EF52222A256}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7BF6385A-C447-42C6-AADC-5EF52222A256}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{F09F3DBA-22B8-4E2B-A14B-1B07BE0872B8} = {5BF5C8FD-6622-425E-88B2-D7C280A7D3CC}
@@ -60,5 +66,6 @@ Global
 		{F3B07D6A-BF77-44E5-874F-9C8369606933} = {5BF5C8FD-6622-425E-88B2-D7C280A7D3CC}
 		{ADA3BE34-50B0-410E-ADF2-0F86D0A21CE9} = {50064411-EA1B-48EF-BA43-7DE073B3F8C4}
 		{CA084378-82CC-45BC-AE9B-7919848DDCA5} = {50064411-EA1B-48EF-BA43-7DE073B3F8C4}
+		{7BF6385A-C447-42C6-AADC-5EF52222A256} = {50064411-EA1B-48EF-BA43-7DE073B3F8C4}
 	EndGlobalSection
 EndGlobal

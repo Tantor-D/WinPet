@@ -5,6 +5,7 @@ using WinPet.Core.Sessions;
 using WinPet.Desktop.Services;
 using WinPet.Desktop.ViewModels;
 using WinPet.Desktop.Views;
+using WinPet.Infrastructure.History;
 using WinPet.Platform.Windows.Activity;
 
 namespace WinPet.Desktop;
@@ -40,9 +41,22 @@ public partial class App : Application
             return new MainWindowViewModel();
         }
 
+        var settings = new WorkSessionSettings();
         var monitor = new WindowsActivityMonitor();
-        var engine = new WorkSessionEngine(new WorkSessionSettings());
-        _trackingService = new ActivityTrackingService(monitor, engine);
+        var engine = new WorkSessionEngine(settings);
+        var databasePath = Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData),
+            "WinPet",
+            "winpet.db");
+        var historyStore = new SqliteActivityHistoryStore(
+            databasePath,
+            settings);
+        historyStore.InitializeAsync().GetAwaiter().GetResult();
+        _trackingService = new ActivityTrackingService(
+            monitor,
+            engine,
+            historyStore);
         return new MainWindowViewModel(_trackingService);
     }
 

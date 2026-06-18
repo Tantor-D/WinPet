@@ -1,4 +1,5 @@
 using WinPet.Core.Activity;
+using WinPet.Core.History;
 using WinPet.Core.Sessions;
 
 namespace WinPet.Desktop.Services;
@@ -7,15 +8,18 @@ public sealed class ActivityTrackingService : IAsyncDisposable
 {
     private readonly IActivityMonitor _activityMonitor;
     private readonly WorkSessionEngine _sessionEngine;
+    private readonly IActivityHistoryStore? _historyStore;
     private readonly CancellationTokenSource _stopping = new();
     private Task? _monitoringTask;
 
     public ActivityTrackingService(
         IActivityMonitor activityMonitor,
-        WorkSessionEngine sessionEngine)
+        WorkSessionEngine sessionEngine,
+        IActivityHistoryStore? historyStore = null)
     {
         _activityMonitor = activityMonitor;
         _sessionEngine = sessionEngine;
+        _historyStore = historyStore;
     }
 
     public event EventHandler<WorkSessionUpdate>? Updated;
@@ -61,6 +65,14 @@ public sealed class ActivityTrackingService : IAsyncDisposable
             _activityMonitor.WatchAsync(cancellationToken))
         {
             var update = _sessionEngine.Process(snapshot);
+            if (_historyStore is not null)
+            {
+                await _historyStore.RecordAsync(
+                    snapshot,
+                    update,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             Updated?.Invoke(this, update);
         }
     }
