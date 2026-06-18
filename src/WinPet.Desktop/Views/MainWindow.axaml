@@ -3,18 +3,97 @@
         xmlns:vm="using:WinPet.Desktop.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d"
+        d:DesignWidth="560"
+        d:DesignHeight="500"
         x:Class="WinPet.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="WinPet.Desktop">
+        Width="560"
+        Height="500"
+        MinWidth="460"
+        MinHeight="420"
+        Title="WinPet 活动监测">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid Margin="32" RowDefinitions="Auto,24,Auto,24,*,24,Auto">
+        <StackPanel Grid.Row="0" Spacing="6">
+            <TextBlock FontSize="14"
+                       Foreground="#697386"
+                       Text="WINPET · 实时活动检测"/>
+            <TextBlock FontSize="34"
+                       FontWeight="SemiBold"
+                       Text="{Binding StateText}"/>
+            <TextBlock Foreground="#697386"
+                       Text="{Binding LastUpdatedText}"/>
+        </StackPanel>
 
+        <Border Grid.Row="2"
+                Padding="22"
+                CornerRadius="18"
+                Background="#F0F5FF">
+            <StackPanel Spacing="8">
+                <TextBlock Foreground="#52647A"
+                           Text="本轮连续工作"/>
+                <TextBlock FontFamily="Consolas"
+                           FontSize="42"
+                           FontWeight="SemiBold"
+                           Text="{Binding ContinuousWorkText}"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4"
+              ColumnDefinitions="*,16,*"
+              RowDefinitions="*,16,*">
+            <Border Padding="18" CornerRadius="14" Background="#F7F8FA">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="#697386" Text="活跃时间"/>
+                    <TextBlock FontFamily="Consolas"
+                               FontSize="22"
+                               Text="{Binding ActiveTimeText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2"
+                    Padding="18"
+                    CornerRadius="14"
+                    Background="#F7F8FA">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="#697386" Text="当前离开"/>
+                    <TextBlock FontFamily="Consolas"
+                               FontSize="22"
+                               Text="{Binding BreakTimeText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Row="2"
+                    Padding="18"
+                    CornerRadius="14"
+                    Background="#FFF5F2">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="#8B5A4A" Text="超时工作"/>
+                    <TextBlock FontFamily="Consolas"
+                               FontSize="22"
+                               Text="{Binding OvertimeText}"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Row="2"
+                    Grid.Column="2"
+                    Padding="18"
+                    CornerRadius="14"
+                    Background="#F4FAF5">
+                <StackPanel Spacing="6">
+                    <TextBlock Foreground="#52705A" Text="有效休息标准"/>
+                    <TextBlock FontSize="22" Text="5 分钟"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Button Grid.Row="6"
+                HorizontalAlignment="Stretch"
+                Padding="16,12"
+                Command="{Binding ResetSessionCommand}"
+                Content="重置本轮工作时间"/>
+    </Grid>
 </Window>
